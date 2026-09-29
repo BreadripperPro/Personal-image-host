@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Local configuration + secrets (NEVER commit)
+config.json
+.session-secret
+
+# Uploaded image files (binary data lives on disk, metadata lives in MySQL)
+uploads/*
+!uploads/.gitkeep
+
+# Logs / OS noise
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
