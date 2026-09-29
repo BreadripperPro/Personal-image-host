@@ -1,0 +1,19 @@
+{
+  "database": {
+    "host": "91.99.159.222",
+    "port": 3306,
+    "database": "s48751_DATA",
+    "user": "YOUR_DATABASE_USERNAME",
+    "password": "YOUR_DATABASE_PASSWORD"
+  },
+  "domain": "https://earth.hidenfree.com",
+
+  "port": null,
+  "uploadsDir": "uploads",
+  "maxFileSizeMb": 25,
+  "allowSvg": false,
+  "publicIdLength": 6,
+  "managementTokenTtlMinutes": 20,
+  "uploadTokenTtlHours": null,
+  "trustProxy": false
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Image Manager</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128193;</text></svg>">
+</head>
+<body>
+  <div class="wrap wide">
+    <header class="top">
+      <div class="brand"><span class="dot"></span> Image Manager</div>
+      <nav>
+        <a href="/">Upload</a>
+        <a href="#" id="logoutLink" style="display:none">Log out</a>
+      </nav>
+    </header>
+
+    <!-- Login -->
+    <section id="loginView">
+      <h1>Management Code</h1>
+      <p class="sub">Type <code>delete</code> in the server console to generate a temporary management code.</p>
+
+      <div id="loginMsg" class="msg"></div>
+
+      <form id="loginForm" class="card" autocomplete="off">
+        <div class="field">
+          <label for="mcode">Management Code</label>
+          <input type="text" id="mcode" placeholder="XXXX-XXXX" required
+                 spellcheck="false" autocapitalize="characters" maxlength="9">
+          <div class="hint">Codes expire automatically (default 20 minutes) and are single-use.</div>
+        </div>
+        <button type="submit" class="primary">Unlock Manager</button>
+      </form>
+    </section>
+
+    <!-- Manager -->
+    <section id="managerView" style="display:none">
+      <div class="toolbar">
+        <div class="count" id="countLabel">Loading&hellip;</div>
+        <div class="btn-row">
+          <button type="button" id="selectAllBtn">Select All</button>
+          <button type="button" id="deleteSelectedBtn" class="danger" disabled>Delete Selected</button>
+        </div>
+      </div>
+
+      <div id="managerMsg" class="msg"></div>
+      <div class="grid" id="grid"></div>
+      <div id="empty" class="card" style="display:none;text-align:center;color:var(--muted)">
+        No images uploaded yet. Type <code>code</code> in the console and upload your first image.
+      </div>
+    </section>
+  </div>
+
+  <!-- Delete confirmation -->
+  <div class="modal-bg" id="modal">
+    <div class="modal">
+      <h3 id="modalTitle">Delete selected images?</h3>
+      <div class="list" id="modalList"></div>
+      <p style="color:var(--muted);font-size:0.85rem;margin:0 0 18px">
+        The file and its database record will be removed. The public URL stops working immediately.
+      </p>
+      <div class="ops">
+        <button type="button" id="cancelDelete">Cancel</button>
+        <button type="button" id="confirmDelete" class="danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied</div>
+  <script src="/manage.js"></script>
+</body>
+</html>
