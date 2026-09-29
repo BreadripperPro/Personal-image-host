@@ -7,9 +7,16 @@ Discord or any forum. No Docker. No Pterodactyl variables. Runs with `node index
 
 ---
 
+## Startup command
+
+```bash
+if [[ -d .git ]] && [[ 0 == "1" ]]; then git pull; fi; if [[ ! -z ${NODE_PACKAGES} ]]; then /usr/local/bin/npm install ${NODE_PACKAGES}; fi; if [[ ! -z ${UNNODE_PACKAGES} ]]; then /usr/local/bin/npm uninstall ${UNNODE_PACKAGES}; fi; if [ -f /home/container/package.json ]; then /usr/local/bin/npm install; fi; if [ "${MAIN_FILE%.js}" != "${MAIN_FILE}" ]; then /usr/local/bin/node "/home/container/${MAIN_FILE}" ${NODE_ARGS}; else /usr/local/bin/ts-node --esm "/home/container/${MAIN_FILE}" ${NODE_ARGS}; fi
+```
+
+---
 ## Setup (2 steps)
 
-### 1. Create `config.json`
+### 1. Edit `config.json`
 
 Copy `config.example.json` to `config.json` and fill in the **username** and
 **password** from your Pterodactyl **database panel** (use the current, rotated
@@ -18,13 +25,13 @@ password):
 ```json
 {
   "database": {
-    "host": "91.99.159.222",
-    "port": 3306,
-    "database": "s48751_DATA",
+    "host": "hostip/domain",
+    "port": port,
+    "database": "DB_name",
     "user": "YOUR_DATABASE_USERNAME",
     "password": "YOUR_DATABASE_PASSWORD"
   },
-  "domain": "https://earth.hidenfree.com"
+  "domain": "example.com"
 }
 ```
 
@@ -41,10 +48,10 @@ node index.js
 On boot the app creates its tables automatically and prints:
 
 ```
-[2026-09-29 12:00:00] INFO  MySQL/MariaDB connected (91.99.159.222:3306/s48751_DATA).
+[2026-09-29 12:00:00] INFO  MySQL/MariaDB connected (DB_address/DB_name).
 [2026-09-29 12:00:00] INFO  Database tables ready.
 [2026-09-29 12:00:00] INFO  Web server running on port 3000.
-[2026-09-29 12:00:00] INFO  Domain: https://earth.hidenfree.com
+[2026-09-29 12:00:00] INFO  Domain: https://example.com
 ```
 
 The port is taken automatically from Pterodactyl's `PORT` variable — nothing to
@@ -69,11 +76,11 @@ Type these directly into the Pterodactyl console while the app is running.
 ```
 > code
 Upload code: KFY3-88LF
-Upload page: https://earth.hidenfree.com/
+Upload page: https://example.com/
 
 > delete
 Management code: 5XM5-SLU5
-Management URL: https://earth.hidenfree.com/manage
+Management URL: https://example.com/manage
 Expires in 20 minutes.
 
 > status
@@ -90,10 +97,10 @@ These run through a readline interface that never blocks the HTTP server.
 ## Workflow
 
 1. `code` in the console -> get an upload code.
-2. Open `https://earth.hidenfree.com/`, paste the code, pick a file, optionally
+2. Open `https://example.com/`, paste the code, pick a file, optionally
    set a custom link, press **Upload**.
 3. Copy the **Direct URL**, **Markdown** or **HTML** snippet.
-4. Use it anywhere: `![image](https://earth.hidenfree.com/i/example)`
+4. Use it anywhere: `![image](https://example.com/i/example)`
 5. Later, run `delete` in the console -> open `/manage` -> enter the code ->
    view, copy or delete images.
 
