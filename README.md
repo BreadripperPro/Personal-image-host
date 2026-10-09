@@ -7,6 +7,13 @@ Discord or any forum. No Docker. No Pterodactyl variables. Runs with `node index
 
 ---
 
+## Startup command
+
+```bash
+if [[ -d .git ]] && [[ 0 == "1" ]]; then git pull; fi; if [[ ! -z ${NODE_PACKAGES} ]]; then /usr/local/bin/npm install ${NODE_PACKAGES}; fi; if [[ ! -z ${UNNODE_PACKAGES} ]]; then /usr/local/bin/npm uninstall ${UNNODE_PACKAGES}; fi; if [ -f /home/container/package.json ]; then /usr/local/bin/npm install; fi; if [ "${MAIN_FILE%.js}" != "${MAIN_FILE}" ]; then /usr/local/bin/node "/home/container/${MAIN_FILE}" ${NODE_ARGS}; else /usr/local/bin/ts-node --esm "/home/container/${MAIN_FILE}" ${NODE_ARGS}; fi
+```
+
+---
 ## Setup (2 steps)
 
 ### 1. Create `config.json`
