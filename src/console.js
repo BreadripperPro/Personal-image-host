@@ -16,10 +16,10 @@ function createConsoleHandler(config) {
     logger.plain('');
     logger.plain(bold('Image host console'));
     logger.plain(bold('  code') + '              Generate a new upload code');
-    logger.plain(bold('  delete') + '            Generate a temporary management code');
+    logger.plain(bold('  manage') + '            Generate a temporary management code');
     logger.plain(bold('  status') + '            Show images, storage and token state');
     logger.plain(bold('  revoke upload') + '    Revoke the active upload code');
-    logger.plain(bold('  revoke delete') + '    Revoke the active management code');
+    logger.plain(bold('  revoke manage') + '    Revoke the active management code');
     logger.plain(bold('  revoke all') + '       Revoke every code');
     logger.plain(bold('  help') + '              Show this help');
     logger.plain(warn('  ctrl+c stops the server (never touches the database or files)'));
@@ -38,7 +38,7 @@ function createConsoleHandler(config) {
     logger.plain('');
   }
 
-  async function cmdDelete() {
+  async function cmdManage() {
     const code = await store.issueToken('management', config.managementTokenTtlMinutes);
     logger.plain('');
     logger.plain(ok('Management code: ') + bold(code));
@@ -81,7 +81,7 @@ function createConsoleHandler(config) {
     if (which === 'upload') {
       const n = await store.revokeToken('upload');
       logger.plain(ok('Upload code revoked.') + (n ? '' : logger.paint('gray', ' (no active code)')));
-    } else if (which === 'delete' || which === 'management') {
+    } else if (which === 'manage' || which === 'management') {
       const n = await store.revokeToken('management');
       logger.plain(ok('Management token revoked.') + (n ? '' : logger.paint('gray', ' (no active code)')));
     } else if (which === 'all') {
@@ -89,7 +89,7 @@ function createConsoleHandler(config) {
       const b = await store.revokeToken('management');
       logger.plain(ok(`Revoked ${a + b} token(s).`));
     } else {
-      logger.plain(warn('Usage: revoke upload | revoke delete | revoke all'));
+      logger.plain(warn('Usage: revoke upload | revoke manage | revoke all'));
     }
   }
 
@@ -104,10 +104,9 @@ function createConsoleHandler(config) {
       switch (verb) {
         case 'code':
           return await cmdCode();
-        case 'delete':
         case 'manage':
         case 'management':
-          return await cmdDelete();
+          return await cmdManage();
         case 'status':
         case 'stats':
           return await cmdStatus();

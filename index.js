@@ -83,7 +83,7 @@ async function main() {
     logger.info(`Web server running on port ${config.port} (${resolvedPort.source}).`);
     logger.info(`Domain: ${config.domain}`);
     logger.info(`Uploads directory: ${config.uploadsDir}`);
-    logger.info(`Type "code" for an upload code, "delete" for a management code, "help" for all commands.`);
+    logger.info(`Type "code" for an upload code, "manage" for a management code, "help" for all commands.`);
   });
 
   server.on('error', (err) => {

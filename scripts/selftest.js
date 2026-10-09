@@ -41,6 +41,7 @@ db.query = async function query(sql, params = []) {
       created_at: stamp(),
       expires_at: hasExpiry ? params[2] : null,
       revoked_at: null,
+      consumed_at: null,
       last_used_at: null
     });
     return { insertId: id, affectedRows: 1 };
@@ -60,10 +61,22 @@ db.query = async function query(sql, params = []) {
     return { affectedRows: t ? 1 : 0 };
   }
 
+  if (/^UPDATE `tokens` SET `consumed_at`/.test(s)) {
+    const t = TABLES.tokens.find(
+      (x) => x.id === Number(params[0]) && x.token_hash === params[1] && x.type === params[2] &&
+        !x.revoked_at && !x.consumed_at && (!x.expires_at || x.expires_at > params[3])
+    );
+    if (t) {
+      t.consumed_at = stamp();
+      t.last_used_at = stamp();
+    }
+    return { affectedRows: t ? 1 : 0 };
+  }
+
   if (/^SELECT `id`, `token_hash`/.test(s)) {
     const now = params[2];
     const t = TABLES.tokens.find(
-      (x) => x.token_hash === params[0] && x.type === params[1] && !x.revoked_at && (!x.expires_at || x.expires_at > now)
+      (x) => x.token_hash === params[0] && x.type === params[1] && !x.revoked_at && !x.consumed_at && (!x.expires_at || x.expires_at > now)
     );
     return t ? [{ id: t.id, token_hash: t.token_hash, type: t.type, created_at: t.created_at, expires_at: t.expires_at }] : [];
   }
@@ -71,7 +84,7 @@ db.query = async function query(sql, params = []) {
   if (/^SELECT `id`, `created_at`, `expires_at`/.test(s)) {
     const now = params[1];
     const t = [...TABLES.tokens].reverse().find(
-      (x) => x.type === params[0] && !x.revoked_at && (!x.expires_at || x.expires_at > now)
+      (x) => x.type === params[0] && !x.revoked_at && !x.consumed_at && (!x.expires_at || x.expires_at > now)
     );
     return t ? [{ id: t.id, created_at: t.created_at, expires_at: t.expires_at }] : [];
   }
@@ -221,15 +234,16 @@ async function main() {
   const firstCode = await store.issueToken('upload', 0);
   const mgmtCode = await store.issueToken('management', 20);
   check('`code` produces an XXXX-XXXX upload code', /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(firstCode), firstCode);
-  check('`delete` produces a different management code', mgmtCode !== firstCode, mgmtCode);
+  check('`manage` produces a different management code', mgmtCode !== firstCode, mgmtCode);
 
   let up = await store.issueToken('upload', 0);
   check('re-running `code` replaces the previous code', up !== firstCode);
-  check('the replaced code no longer verifies', (await store.verifyToken('upload', firstCode)) === null);
-  check('the new code verifies', Boolean(await store.verifyToken('upload', up)));
+  check('the replaced code cannot be consumed', (await store.consumeToken('upload', firstCode)) === null);
+  check('the new code is consumed on first use', Boolean(await store.consumeToken('upload', up)));
+  check('a consumed upload code cannot be used again', (await store.consumeToken('upload', up)) === null);
   check('only a 64-char hash is stored, never the plaintext', TABLES.tokens.every((t) => t.token_hash.length === 64 && !Object.values(t).includes(up)));
-  check('management code does NOT verify as an upload code', (await store.verifyToken('upload', mgmtCode)) === null);
-  check('upload code does NOT verify as a management code', (await store.verifyToken('management', up)) === null);
+  check('management code cannot be consumed as an upload code', (await store.consumeToken('upload', mgmtCode)) === null);
+  check('upload code cannot be consumed as a management code', (await store.consumeToken('management', up)) === null);
 
   /* ---------------- 2. upload auth ---------------- */
   section('2. Upload authentication (server-side)');
@@ -380,7 +394,7 @@ async function main() {
 
   // Simulate the 20 minute TTL elapsing.
   TABLES.tokens.filter((t) => t.type === 'management' && !t.revoked_at).forEach((t) => { t.expires_at = '2000-01-01 00:00:00'; });
-  check('an expired management code no longer verifies', (await store.verifyToken('management', mgmt2)) === null);
+  check('an expired management code cannot be consumed', (await store.consumeToken('management', mgmt2)) === null);
   check('an expired management code cannot log in -> 401', (await postJson('/api/manage/login', { code: mgmt2 })).status === 401);
   check('an expired management session is rejected -> 401', (await fetch(`${base}/api/manage/images`, { headers: { Cookie: cookie } })).status === 401);
 

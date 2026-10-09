@@ -28,6 +28,7 @@ const TABLE_DEFINITIONS = [
     \`created_at\` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     \`expires_at\` DATETIME     NULL DEFAULT NULL,
     \`revoked_at\` DATETIME     NULL DEFAULT NULL,
+    \`consumed_at\` DATETIME    NULL DEFAULT NULL,
     \`last_used_at\` DATETIME   NULL DEFAULT NULL,
     PRIMARY KEY (\`id\`),
     UNIQUE KEY \`uq_tokens_hash\` (\`token_hash\`),
@@ -46,6 +47,7 @@ const EXPECTED_COLUMNS = {
     custom_slug: 'VARCHAR(191) NULL DEFAULT NULL'
   },
   tokens: {
+    consumed_at: 'DATETIME NULL DEFAULT NULL',
     last_used_at: 'DATETIME NULL DEFAULT NULL',
     expires_at: 'DATETIME NULL DEFAULT NULL',
     revoked_at: 'DATETIME NULL DEFAULT NULL'

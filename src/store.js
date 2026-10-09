@@ -19,7 +19,7 @@ function utcNow() {
  * ------------------------------------------------------------------------ */
 
 // Issuing a new token always revokes every previous token of the same type,
-// so "code" replaces the old upload code and "delete" replaces the old
+// so "code" replaces the old upload code and "manage" replaces the old
 // management code. Only the SHA-256 hash is ever persisted.
 async function issueToken(type, ttlMinutes) {
   // Imported lazily to keep this module free of circular requires.
@@ -62,10 +62,11 @@ async function revokeToken(type) {
 }
 
 /**
- * Validate a plaintext code against the database.
- * @returns {Promise<object|null>} the token row, or null when invalid.
+ * Atomically validate and consume a plaintext code. The conditional update
+ * prevents two simultaneous requests from spending the same code.
+ * @returns {Promise<object|null>} the token row, or null when invalid or used.
  */
-async function verifyToken(type, plainCode) {
+async function consumeToken(type, plainCode) {
   const { normalizeCode } = require('./security');
   const normalized = normalizeCode(plainCode);
   if (!normalized) return null;
@@ -74,6 +75,7 @@ async function verifyToken(type, plainCode) {
     `SELECT \`id\`, \`token_hash\`, \`type\`, \`created_at\`, \`expires_at\`
        FROM \`tokens\`
       WHERE \`token_hash\` = ? AND \`type\` = ? AND \`revoked_at\` IS NULL
+        AND \`consumed_at\` IS NULL
         AND (\`expires_at\` IS NULL OR \`expires_at\` > ?)
       LIMIT 1`,
     [sha256(normalized), type, utcNow()]
@@ -81,8 +83,15 @@ async function verifyToken(type, plainCode) {
 
   if (rows.length === 0) return null;
 
-  // Fire-and-forget usage tracking; failure here must never break a request.
-  db.query('UPDATE `tokens` SET `last_used_at` = NOW() WHERE `id` = ?', [rows[0].id]).catch(() => {});
+  const result = await db.query(
+    `UPDATE \`tokens\`
+        SET \`consumed_at\` = NOW(), \`last_used_at\` = NOW()
+      WHERE \`id\` = ? AND \`token_hash\` = ? AND \`type\` = ?
+        AND \`revoked_at\` IS NULL AND \`consumed_at\` IS NULL
+        AND (\`expires_at\` IS NULL OR \`expires_at\` > ?)`,
+    [rows[0].id, sha256(normalized), type, utcNow()]
+  );
+  if (!result.affectedRows) return null;
 
   return rows[0];
 }
@@ -92,6 +101,7 @@ async function getActiveToken(type) {
     `SELECT \`id\`, \`created_at\`, \`expires_at\`
        FROM \`tokens\`
       WHERE \`type\` = ? AND \`revoked_at\` IS NULL
+        AND \`consumed_at\` IS NULL
         AND (\`expires_at\` IS NULL OR \`expires_at\` > ?)
       ORDER BY \`id\` DESC LIMIT 1`,
     [type, utcNow()]
@@ -187,7 +197,7 @@ module.exports = {
   utcNow,
   issueToken,
   revokeToken,
-  verifyToken,
+  consumeToken,
   getActiveToken,
   slugExists,
   publicIdExists,

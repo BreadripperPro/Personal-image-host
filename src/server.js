@@ -88,9 +88,9 @@ function createApp(config, secret) {
    * ================================================================== */
   async function handleUpload(req, res) {
     const suppliedCode = (req.body && req.body.code) || req.get('X-Upload-Code') || '';
-    const token = await store.verifyToken('upload', suppliedCode);
+    const token = await store.consumeToken('upload', suppliedCode);
     if (!token) {
-      return res.status(401).json({ ok: false, error: 'invalid_code', message: 'Invalid or revoked upload code.' });
+      return res.status(401).json({ ok: false, error: 'invalid_code', message: 'Invalid, used, expired or revoked upload code.' });
     }
 
     const file = req.file;
@@ -218,16 +218,24 @@ function createApp(config, secret) {
   }
 
   async function handleManageLogin(req, res) {
-    const token = await store.verifyToken('management', (req.body && req.body.code) || '');
+    const token = await store.consumeToken('management', (req.body && req.body.code) || '');
     if (!token) {
       return res.status(401).json({
         ok: false,
         error: 'invalid_code',
-        message: 'Invalid, expired or revoked management code.'
+        message: 'Invalid, used, expired or revoked management code.'
       });
     }
-    const value = session.create(secret, { tokenId: token.id });
-    session.setCookie(res, value, { secure: isHttps });
+    // A management session lasts only for the code's remaining lifetime. The
+    // database expiry check in resolveManagementSession remains authoritative.
+    const expiry = token.expires_at
+      ? new Date(token.expires_at.replace(' ', 'T') + 'Z').getTime()
+      : null;
+    const remainingSeconds = expiry
+      ? Math.max(1, Math.ceil((expiry - Date.now()) / 1000))
+      : session.SESSION_TTL_MINUTES * 60;
+    const value = session.create(secret, { tokenId: token.id, ttlSeconds: remainingSeconds });
+    session.setCookie(res, value, { secure: isHttps, maxAgeSeconds: remainingSeconds });
     return res.json({ ok: true });
   }
 

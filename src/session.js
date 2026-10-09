@@ -56,24 +56,30 @@ function verify(token, secret) {
   }
 }
 
-function create(secret, { tokenId }) {
+function create(secret, { tokenId, ttlSeconds }) {
+  const lifetimeSeconds = Number.isFinite(ttlSeconds) && ttlSeconds > 0
+    ? ttlSeconds
+    : SESSION_TTL_MINUTES * 60;
   return sign(
     {
       tid: tokenId,
       iat: Date.now(),
-      exp: Date.now() + SESSION_TTL_MINUTES * 60 * 1000
+      exp: Date.now() + lifetimeSeconds * 1000
     },
     secret
   );
 }
 
-function setCookie(res, value, { secure }) {
+function setCookie(res, value, { secure, maxAgeSeconds }) {
+  const lifetimeSeconds = Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0
+    ? maxAgeSeconds
+    : SESSION_TTL_MINUTES * 60;
   const parts = [
     `${COOKIE_NAME}=${value}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Strict',
-    `Max-Age=${SESSION_TTL_MINUTES * 60}`
+    `Max-Age=${lifetimeSeconds}`
   ];
   if (secure) parts.push('Secure');
   res.append('Set-Cookie', parts.join('; '));
