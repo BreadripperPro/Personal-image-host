@@ -88,8 +88,7 @@ function createApp(config, secret) {
    * ================================================================== */
   async function handleUpload(req, res) {
     const suppliedCode = (req.body && req.body.code) || req.get('X-Upload-Code') || '';
-    const token = await store.consumeToken('upload', suppliedCode);
-    if (!token) {
+    if (!(await store.isTokenValid('upload', suppliedCode))) {
       return res.status(401).json({ ok: false, error: 'invalid_code', message: 'Invalid, used, expired or revoked upload code.' });
     }
 
@@ -142,6 +141,14 @@ function createApp(config, secret) {
       return res.status(503).json({ ok: false, error: 'id_exhausted', message: 'Could not allocate a unique id, please retry.' });
     }
 
+    // Consume at the last possible point. This preserves the code after a
+    // malformed request while ensuring concurrent valid uploads cannot both
+    // write a file with the same one-time code.
+    const token = await store.consumeToken('upload', suppliedCode);
+    if (!token) {
+      return res.status(401).json({ ok: false, error: 'invalid_code', message: 'Invalid, used, expired or revoked upload code.' });
+    }
+
     const absolute = path.join(uploadsRoot, storedFilename);
     await fsp.writeFile(absolute, file.buffer);
 
@@ -178,6 +185,21 @@ function createApp(config, secret) {
       size: file.buffer.length,
       sizeLabel: formatBytes(file.buffer.length)
     });
+  }
+
+  // This check intentionally does not consume the code. The upload endpoint
+  // consumes it atomically after the browser has passed this gate and sends
+  // the multipart image request.
+  async function handleUploadCodeValidation(req, res) {
+    const valid = await store.isTokenValid('upload', (req.body && req.body.code) || '');
+    if (!valid) {
+      return res.status(401).json({
+        ok: false,
+        error: 'invalid_code',
+        message: 'Invalid, used, expired or revoked upload code.'
+      });
+    }
+    return res.json({ ok: true });
   }
 
 
@@ -337,6 +359,12 @@ function createApp(config, secret) {
 
   // ---- API ----
   app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+  // Validate the code in a small request before the client begins uploading
+  // multipart image data. /api/upload repeats the check and consumes the code.
+  app.post('/api/upload/validate', express.json({ limit: '2kb' }), (req, res, next) =>
+    handleUploadCodeValidation(req, res).catch(next)
+  );
 
   app.post(
     '/api/upload',

@@ -96,6 +96,28 @@ async function consumeToken(type, plainCode) {
   return rows[0];
 }
 
+/**
+ * Check whether a plaintext code can still be used without consuming it.
+ * This supports validating an upload code before the browser sends the image
+ * bytes; consumeToken() remains the authoritative, atomic check on upload.
+ */
+async function isTokenValid(type, plainCode) {
+  const { normalizeCode } = require('./security');
+  const normalized = normalizeCode(plainCode);
+  if (!normalized) return false;
+
+  const rows = await db.query(
+    `SELECT \`id\`
+       FROM \`tokens\`
+      WHERE \`token_hash\` = ? AND \`type\` = ? AND \`revoked_at\` IS NULL
+        AND \`consumed_at\` IS NULL
+        AND (\`expires_at\` IS NULL OR \`expires_at\` > ?)
+      LIMIT 1`,
+    [sha256(normalized), type, utcNow()]
+  );
+  return rows.length > 0;
+}
+
 async function getActiveToken(type) {
   const rows = await db.query(
     `SELECT \`id\`, \`created_at\`, \`expires_at\`
@@ -198,6 +220,7 @@ module.exports = {
   issueToken,
   revokeToken,
   consumeToken,
+  isTokenValid,
   getActiveToken,
   slugExists,
   publicIdExists,

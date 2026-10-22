@@ -89,6 +89,14 @@ db.query = async function query(sql, params = []) {
     return t ? [{ id: t.id, created_at: t.created_at, expires_at: t.expires_at }] : [];
   }
 
+  if (/^SELECT `id` FROM `tokens` WHERE `token_hash`/.test(s)) {
+    const now = params[2];
+    const t = TABLES.tokens.find(
+      (x) => x.token_hash === params[0] && x.type === params[1] && !x.revoked_at && !x.consumed_at && (!x.expires_at || x.expires_at > now)
+    );
+    return t ? [{ id: t.id }] : [];
+  }
+
   if (/^SELECT `id` FROM `tokens`/.test(s)) {
     const now = params[1];
     const t = TABLES.tokens.find(
@@ -213,6 +221,8 @@ async function main() {
       body: JSON.stringify(body)
     });
 
+  const validateUploadCode = (code) => postJson('/api/upload/validate', { code });
+
   console.log('Self-test: personal image host\n' + '='.repeat(62));
 
   /* ---------------- 0. port resolution ---------------- */
@@ -247,6 +257,7 @@ async function main() {
 
   /* ---------------- 2. upload auth ---------------- */
   section('2. Upload authentication (server-side)');
+  check('invalid upload code is rejected before multipart upload -> 401', (await validateUploadCode('AAAA-BBBB')).status === 401);
   check('upload without a code -> 401', (await uploadForm(undefined, PNG_BYTES, 'a.png')).status === 401);
   check('upload with a wrong code -> 401', (await uploadForm('AAAA-BBBB', PNG_BYTES, 'a.png')).status === 401);
   check('management code cannot upload -> 401', (await uploadForm(mgmtCode, PNG_BYTES, 'a.png')).status === 401);
@@ -256,6 +267,8 @@ async function main() {
   check('revoked upload code -> 401', (await uploadForm(revokedCode, PNG_BYTES, 'a.png')).status === 401);
   up = await store.issueToken('upload', 0);
   check('a fresh upload code can be issued after revocation', up !== revokedCode);
+  check('valid upload code passes pre-upload validation -> 200', (await validateUploadCode(up)).status === 200);
+  check('pre-upload validation does not consume the code', (await validateUploadCode(up)).status === 200);
 
   const emptyForm = new FormData();
   emptyForm.append('code', up);
@@ -271,6 +284,7 @@ async function main() {
 
   /* ---------------- 4. successful upload ---------------- */
   section('4. Upload and direct URL generation');
+  up = await store.issueToken('upload', 0);
   const r1 = await uploadForm(up, PNG_BYTES, 'cat.png');
   const b1 = await r1.json();
   const row1 = lastImage();
@@ -285,6 +299,7 @@ async function main() {
   check('file written to the uploads dir', fs.existsSync(path.join(uploadsDir, row1.stored_filename)));
   check('no binary image data stored in the DB', row1.byte_size === PNG_BYTES.length && !('data' in row1));
 
+  up = await store.issueToken('upload', 0);
   const r2 = await uploadForm(up, PNG_BYTES, 'logo.jpg', 'summer2026');
   const b2 = await r2.json();
   check('custom slug produces /i/<slug>', b2.url === 'https://earth.hidenfree.com/i/summer2026', b2.url);
@@ -292,6 +307,7 @@ async function main() {
 
   /* ---------------- 5. slug safety ---------------- */
   section('5. Custom slug safety');
+  up = await store.issueToken('upload', 0);
   const badSlugs = ['../etc/passwd', 'a/b', 'a\\b', '.hidden', 'has space', 'x'.repeat(65), 'manage', 'api'];
   const badResults = [];
   for (const s of badSlugs) {
@@ -301,6 +317,7 @@ async function main() {
   check('all unsafe / reserved slugs rejected with 400', badResults.length === 0, badResults.join(', '));
   check('duplicate custom slug -> 409', (await uploadForm(up, PNG_BYTES, 'x.png', 'summer2026')).status === 409);
   check('path traversal on /i/:id -> 404', (await fetch(`${base}/i/${encodeURIComponent('../../config.json')}`)).status === 404);
+  up = await store.issueToken('upload', 0);
   check('empty slug falls back to a random id', (await uploadForm(up, PNG_BYTES, 'x.png', '')).status === 201);
 
   /* ---------------- 6. direct image route ---------------- */

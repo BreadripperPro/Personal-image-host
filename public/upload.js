@@ -118,16 +118,29 @@
 
     if (!currentFile) { showMessage('Please choose an image first.', 'error'); return; }
 
-    const fd = new FormData();
-    fd.append('code', $('code').value.trim());
-    fd.append('image', currentFile, currentFile.name);
-    const slug = $('slug').value.trim();
-    if (slug) fd.append('slug', slug);
-
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span>Uploading…';
+    submitBtn.innerHTML = '<span class="spinner"></span>Checking code…';
 
     try {
+      // Do this before creating/sending the multipart request so an invalid
+      // code never causes the selected image bytes to be uploaded.
+      const validation = await fetch('/api/upload/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: $('code').value.trim() })
+      });
+      const validationData = await validation.json().catch(() => ({}));
+      if (!validation.ok || !validationData.ok) {
+        throw new Error(validationData.message || 'Code validation failed (HTTP ' + validation.status + ').');
+      }
+
+      const fd = new FormData();
+      fd.append('code', $('code').value.trim());
+      fd.append('image', currentFile, currentFile.name);
+      const slug = $('slug').value.trim();
+      if (slug) fd.append('slug', slug);
+
+      submitBtn.innerHTML = '<span class="spinner"></span>Uploading…';
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
 
